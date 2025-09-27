@@ -1,6 +1,7 @@
 import { getIsAdmin, getOrCreateVoterId } from '../pollIdentity';
 
 const STORAGE_KEY = 'poll-admin:test';
+const MOCK_UUID = '123e4567-e89b-12d3-a456-426614174000';
 
 beforeEach(() => {
   localStorage.clear();
@@ -21,12 +22,12 @@ describe('pollIdentity utilities', () => {
   });
 
   it('creates and stores a voter id when missing', () => {
-    const spy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('generated-id');
+    const spy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
 
     const voterId = getOrCreateVoterId('test');
 
-    expect(voterId).toBe('generated-id');
-    expect(localStorage.getItem('poll-voter:test')).toBe('generated-id');
+    expect(voterId).toBe(MOCK_UUID);
+    expect(localStorage.getItem('poll-voter:test')).toBe(MOCK_UUID);
     expect(spy).toHaveBeenCalled();
   });
 });

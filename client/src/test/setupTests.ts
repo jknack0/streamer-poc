@@ -1,12 +1,14 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
+const FALLBACK_UUID = '00000000-0000-4000-8000-000000000000';
+
 if (!globalThis.crypto) {
   globalThis.crypto = {} as Crypto;
 }
 
 if (!globalThis.crypto.randomUUID) {
-  globalThis.crypto.randomUUID = () => `test-${Math.random().toString(16).slice(2)}`;
+  globalThis.crypto.randomUUID = () => FALLBACK_UUID;
 }
 
 export const mockClipboard = () => {
