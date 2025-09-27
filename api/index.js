@@ -65,7 +65,12 @@ pollSocket.register();
 
 if (isProduction) {
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/polls') || req.path.startsWith('/socket.io')) {
+    if (req.path.startsWith('/socket.io')) {
+      return next();
+    }
+
+    const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
+    if (!acceptsHtml) {
       return next();
     }
 
@@ -94,3 +99,6 @@ const shutdown = () => {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+
+
