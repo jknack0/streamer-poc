@@ -47,15 +47,6 @@
   color: rgba(173, 207, 255, 0.75);
 }
 
-.champion-select__timer {
-  font-size: clamp(2.4rem, 5vw, 4rem);
-  font-weight: 700;
-  color: #cce4ff;
-  text-shadow: 0 0 20px rgba(108, 189, 255, 0.6);
-  min-width: 80px;
-  text-align: center;
-}
-
 .champion-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -207,10 +198,6 @@
   .champion-select__header {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .champion-select__timer {
-    align-self: flex-end;
   }
 
   .lock-in-button {

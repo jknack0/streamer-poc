@@ -1,7 +1,9 @@
-﻿const express = require('express');
+
+const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
+const path = require('path');
 const { openDatabase } = require('./db/database');
 const { createPollStore } = require('./db/polls');
 const { createPollController } = require('./controllers/pollController');
@@ -34,6 +36,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+const clientDistPath = path.resolve(__dirname, '..', 'client', 'dist');
+if (isProduction) {
+  app.use(express.static(clientDistPath));
+}
+
 const db = openDatabase();
 const polls = createPollStore(db);
 
@@ -56,9 +63,19 @@ app.use('/polls', createPollRouter(pollController));
 
 pollSocket.register();
 
-app.get('/', (req, res) => {
-  res.json({ message: 'API is running' });
-});
+if (isProduction) {
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/polls') || req.path.startsWith('/socket.io')) {
+      return next();
+    }
+
+    return res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  app.get('/', (req, res) => {
+    res.json({ message: 'API is running' });
+  });
+}
 
 server.listen(PORT, () => {
   // eslint-disable-next-line no-console

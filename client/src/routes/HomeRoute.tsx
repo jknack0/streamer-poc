@@ -21,7 +21,7 @@ const HomeRoute = () => {
     try {
       await createPoll({ id: pollId });
       localStorage.setItem(`${ADMIN_KEY_PREFIX}${pollId}`, 'true');
-      navigate(`/polls/${pollId}`);
+      navigate(`/polls/${pollId}/admin`);
     } catch (error) {
       if (error instanceof ApiError) {
         setHomeError(error.message);
@@ -50,3 +50,4 @@ const HomeRoute = () => {
 };
 
 export default HomeRoute;
+

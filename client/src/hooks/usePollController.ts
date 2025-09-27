@@ -1,8 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import type { Socket } from 'socket.io-client';
-import ChampionSelect from '../components/ChampionSelect';
 import type { Champion } from '../data/junglers';
+import type { Poll } from '../services/polls';
 import {
   ApiError,
   clearVotes,
@@ -11,39 +10,30 @@ import {
   recordVote,
   updatePollStatus,
 } from '../services/polls';
-import type { Poll } from '../services/polls';
 import { createSocket, type PollErrorEvent, type PollUpdateEvent, type PollVotesEvent } from '../services/socket';
-import { ADMIN_KEY_PREFIX, VOTER_KEY_PREFIX } from '../constants/storage';
-import type { PollStatus, TopVote } from '../types/poll';
+import type { TopVote } from '../types/poll';
+import { getOrCreateVoterId } from '../utils/pollIdentity';
 
-const getIsAdmin = (pollId: string) => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
+interface UsePollControllerResult {
+  poll: Poll | null;
+  pollVersion: number;
+  isLoadingPoll: boolean;
+  pollError: string | null;
+  isUpdatingStatus: boolean;
+  statusMessage: string | null;
+  statusError: string | null;
+  isLockingIn: boolean;
+  topVotes: TopVote[];
+  totalVotes: number;
+  socketError: string | null;
+  lockedChampionSlug: string | null;
+  startPoll: () => Promise<void>;
+  stopPoll: () => Promise<void>;
+  restartPoll: () => Promise<void>;
+  lockIn: (champion: Champion) => Promise<void>;
+}
 
-  return localStorage.getItem(`${ADMIN_KEY_PREFIX}${pollId}`) === 'true';
-};
-
-const getOrCreateVoterId = (pollId: string) => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const storageKey = `${VOTER_KEY_PREFIX}${pollId}`;
-  const existing = localStorage.getItem(storageKey);
-  if (existing) {
-    return existing;
-  }
-
-  const voterId = crypto.randomUUID();
-  localStorage.setItem(storageKey, voterId);
-  return voterId;
-};
-
-const PollRoute = () => {
-  const navigate = useNavigate();
-  const { pollId } = useParams<{ pollId: string }>();
-
+const usePollController = (pollId?: string | null): UsePollControllerResult => {
   const [poll, setPoll] = useState<Poll | null>(null);
   const [pollVersion, setPollVersion] = useState(0);
   const [isLoadingPoll, setIsLoadingPoll] = useState(false);
@@ -60,10 +50,6 @@ const PollRoute = () => {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    if (!pollId) {
-      return;
-    }
-
     setPoll(null);
     setPollVersion(0);
     setPollError(null);
@@ -248,7 +234,7 @@ const PollRoute = () => {
     };
   }, [pollId]);
 
-  const handleStartPoll = useCallback(async () => {
+  const startPoll = useCallback(async () => {
     if (!pollId || !poll) {
       return;
     }
@@ -274,7 +260,7 @@ const PollRoute = () => {
     }
   }, [poll, pollId]);
 
-  const handleStopPoll = useCallback(async () => {
+  const stopPoll = useCallback(async () => {
     if (!pollId || !poll) {
       return;
     }
@@ -300,7 +286,7 @@ const PollRoute = () => {
     }
   }, [poll, pollId]);
 
-  const handleRestartPoll = useCallback(async () => {
+  const restartPoll = useCallback(async () => {
     if (!pollId || !poll) {
       return;
     }
@@ -331,7 +317,7 @@ const PollRoute = () => {
     }
   }, [poll, pollId]);
 
-  const handleLockIn = useCallback(
+  const lockIn = useCallback(
     async (champion: Champion) => {
       if (!pollId || !poll) {
         throw new Error('Poll not ready');
@@ -369,59 +355,24 @@ const PollRoute = () => {
     [lockedChampionSlug, poll, pollId],
   );
 
-  if (!pollId) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (pollError) {
-    return (
-      <div className="poll-message">
-        <div className="poll-message__panel">
-          <h1 className="poll-message__title">{pollError}</h1>
-          <button type="button" className="poll-message__cta" onClick={() => navigate('/')}>
-            Back to Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!poll) {
-    return (
-      <div className="poll-message">
-        <div className="poll-message__panel">
-          <h1 className="poll-message__title">Loading poll...</h1>
-        </div>
-      </div>
-    );
-  }
-
-  const pollStatus: PollStatus = poll.status;
-  const pollUrl = typeof window !== 'undefined' ? window.location.href : '';
-  const isAdmin = getIsAdmin(pollId);
-
-  return (
-    <ChampionSelect
-      key={`${pollId}-${pollVersion}`}
-      pollId={pollId}
-      pollUrl={pollUrl}
-      pollStatus={pollStatus}
-      isAdmin={isAdmin}
-      isLoading={isLoadingPoll}
-      isUpdatingPoll={isUpdatingStatus}
-      isLockingIn={isLockingIn}
-      statusMessage={statusMessage}
-      statusError={statusError}
-      topVotes={topVotes}
-      totalVotes={totalVotes}
-      socketError={socketError}
-      lockedChampionSlug={lockedChampionSlug}
-      onStartPoll={handleStartPoll}
-      onStopPoll={handleStopPoll}
-      onRestartPoll={handleRestartPoll}
-      onLockIn={handleLockIn}
-    />
-  );
+  return {
+    poll,
+    pollVersion,
+    isLoadingPoll,
+    pollError,
+    isUpdatingStatus,
+    statusMessage,
+    statusError,
+    isLockingIn,
+    topVotes,
+    totalVotes,
+    socketError,
+    lockedChampionSlug,
+    startPoll,
+    stopPoll,
+    restartPoll,
+    lockIn,
+  };
 };
 
-export default PollRoute;
+export default usePollController;
