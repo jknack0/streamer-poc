@@ -2,12 +2,22 @@
 const path = require('path');
 const Database = require('better-sqlite3');
 
-const DEFAULT_DB_PATH = process.env.DATABASE_PATH
-  ? path.resolve(process.env.DATABASE_PATH)
-  : path.join(__dirname, '..', 'data', 'polls.sqlite');
+const resolveDatabasePath = () => {
+  if (process.env.DATABASE_PATH) {
+    return path.resolve(process.env.DATABASE_PATH);
+  }
+
+  return path.join(__dirname, '..', 'data', 'polls.sqlite');
+};
+
+const DEFAULT_DB_PATH = resolveDatabasePath();
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
 const ensureDirectory = (filePath) => {
+  if (filePath === ':memory:' || filePath.startsWith('file:')) {
+    return;
+  }
+
   const directory = path.dirname(filePath);
   if (!fs.existsSync(directory)) {
     fs.mkdirSync(directory, { recursive: true });
@@ -62,16 +72,20 @@ const applyMigrations = (db) => {
   });
 };
 
-const openDatabase = () => {
-  ensureDirectory(DEFAULT_DB_PATH);
+const createDatabase = (databasePath = DEFAULT_DB_PATH) => {
+  ensureDirectory(databasePath);
 
-  const db = new Database(DEFAULT_DB_PATH);
+  const db = new Database(databasePath);
   db.pragma('foreign_keys = ON');
   applyMigrations(db);
 
   return db;
 };
 
+const openDatabase = () => createDatabase(DEFAULT_DB_PATH);
+
 module.exports = {
   openDatabase,
+  createDatabase,
+  resolveDatabasePath,
 };
