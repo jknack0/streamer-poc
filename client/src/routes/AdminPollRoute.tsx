@@ -38,7 +38,8 @@ const AdminPollRoute = () => {
     );
   }
 
-  const pollUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const adminUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const pollUrl = adminUrl.replace(/\/admin\/?$/, '');
 
   return (
     <PollAdminView
