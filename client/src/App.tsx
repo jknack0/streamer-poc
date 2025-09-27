@@ -52,7 +52,7 @@ const App = () => {
   const [route, setRoute] = useState<Route>(() => {
     if (typeof window === 'undefined') {
       return { name: 'home' };
-  }
+    }
 
     return parsePath(window.location.pathname);
   });
@@ -69,6 +69,7 @@ const App = () => {
   const [topVotes, setTopVotes] = useState<TopVote[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
   const [socketError, setSocketError] = useState<string | null>(null);
+  const [lockedChampionSlug, setLockedChampionSlug] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -96,6 +97,7 @@ const App = () => {
       setTopVotes([]);
       setTotalVotes(0);
       setSocketError(null);
+      setLockedChampionSlug(null);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -103,12 +105,14 @@ const App = () => {
       return;
     }
 
+    const voterId = getOrCreateVoterId(route.pollId) ?? undefined;
     let isMounted = true;
     const loadPoll = async () => {
       setIsLoadingPoll(true);
       setPollError(null);
       setTopVotes([]);
       setTotalVotes(0);
+      setLockedChampionSlug(null);
 
       try {
         const data = await fetchPoll(route.pollId);
@@ -126,6 +130,11 @@ const App = () => {
 
           setTopVotes(voteData.topVotes);
           setTotalVotes(voteData.totalVotes);
+
+          if (voterId) {
+            const existingVote = voteData.votes.find((vote) => vote.voterId === voterId);
+            setLockedChampionSlug(existingVote?.championSlug ?? null);
+          }
         } catch (voteError) {
           if (isMounted) {
             const message =
@@ -282,7 +291,7 @@ const App = () => {
       return;
     }
 
-  setIsCreatingPoll(true);
+    setIsCreatingPoll(true);
     setHomeError(null);
 
     const pollId = crypto.randomUUID();
@@ -293,6 +302,7 @@ const App = () => {
       setPoll(createdPoll);
       setTopVotes([]);
       setTotalVotes(0);
+      setLockedChampionSlug(null);
       navigate({ name: 'poll', pollId });
     } catch (error) {
       if (error instanceof ApiError) {
@@ -375,6 +385,7 @@ const App = () => {
       setPollVersion((current) => current + 1);
       setTopVotes([]);
       setTotalVotes(0);
+      setLockedChampionSlug(null);
       setStatusMessage('Poll restarted');
     } catch (error) {
       if (error instanceof ApiError) {
@@ -395,13 +406,21 @@ const App = () => {
         throw new Error('Poll not ready');
       }
 
+      if (lockedChampionSlug) {
+        throw new Error('You have already voted.');
+      }
+
       setIsLockingIn(true);
       try {
         const voterId = getOrCreateVoterId(poll.id);
+        if (!voterId) {
+          throw new Error('Missing voter id');
+        }
         const response = await recordVote(poll.id, champion.slug, voterId);
         setPoll(response.poll);
         setTopVotes(response.topVotes);
         setTotalVotes(response.totalVotes);
+        setLockedChampionSlug(champion.slug);
       } catch (error) {
         if (error instanceof ApiError) {
           throw new Error(error.message);
@@ -416,7 +435,7 @@ const App = () => {
         setIsLockingIn(false);
       }
     },
-    [poll, route],
+    [lockedChampionSlug, poll, route],
   );
 
   if (route.name === 'home') {
@@ -482,6 +501,7 @@ const App = () => {
       topVotes={topVotes}
       totalVotes={totalVotes}
       socketError={socketError}
+      lockedChampionSlug={lockedChampionSlug}
       onStartPoll={handleStartPoll}
       onStopPoll={handleStopPoll}
       onRestartPoll={handleRestartPoll}

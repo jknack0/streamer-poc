@@ -65,6 +65,13 @@ const createPollController = ({ polls, serializePoll, emitPollStatus, emitVoteSu
       return;
     }
 
+    const normalizedVoterId = typeof voterId === 'string' ? voterId.trim() : '';
+
+    if (!normalizedVoterId) {
+      res.status(400).json({ error: 'voterId is required' });
+      return;
+    }
+
     const poll = polls.findById(req.params.id);
     if (!poll) {
       res.status(404).json({ error: 'Poll not found' });
@@ -74,7 +81,7 @@ const createPollController = ({ polls, serializePoll, emitPollStatus, emitVoteSu
     try {
       const result = polls.recordVote({
         pollId: req.params.id,
-        voterId: typeof voterId === 'string' && voterId.trim().length > 0 ? voterId : null,
+        voterId: normalizedVoterId,
         championSlug: championSlug.trim(),
       });
 
@@ -90,6 +97,21 @@ const createPollController = ({ polls, serializePoll, emitPollStatus, emitVoteSu
         totalVotes: result.totalVotes,
       });
     } catch (error) {
+      if (error?.code === 'ALREADY_VOTED' || error?.message === 'ALREADY_VOTED') {
+        res.status(409).json({ error: 'You have already voted in this poll.' });
+        return;
+      }
+
+      if (error?.code === 'VOTER_ID_REQUIRED' || error?.message === 'VOTER_ID_REQUIRED') {
+        res.status(400).json({ error: 'voterId is required' });
+        return;
+      }
+
+      if (/UNIQUE constraint failed: poll_votes\.poll_id, poll_votes\.voter_id/.test(error.message)) {
+        res.status(409).json({ error: 'You have already voted in this poll.' });
+        return;
+      }
+
       res.status(500).json({ error: 'Failed to record vote' });
     }
   };

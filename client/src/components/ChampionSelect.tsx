@@ -23,6 +23,7 @@ interface ChampionSelectProps {
   topVotes: TopVote[];
   totalVotes: number;
   socketError?: string | null;
+  lockedChampionSlug?: string | null;
   onStartPoll: () => void | Promise<void>;
   onStopPoll: () => void | Promise<void>;
   onRestartPoll: () => void | Promise<void>;
@@ -48,6 +49,7 @@ const ChampionSelect = ({
   topVotes,
   totalVotes,
   socketError,
+  lockedChampionSlug = null,
   onStartPoll,
   onStopPoll,
   onRestartPoll,
@@ -57,6 +59,16 @@ const ChampionSelect = ({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [lockInFeedback, setLockInFeedback] = useState<LockInFeedbackState>('idle');
   const [lockInError, setLockInError] = useState<string | null>(null);
+
+  const lockedChampion = lockedChampionSlug
+    ? CHAMPIONS_BY_SLUG.get(lockedChampionSlug) ?? null
+    : null;
+
+  useEffect(() => {
+    if (lockedChampion) {
+      setSelectedChampion(lockedChampion);
+    }
+  }, [lockedChampion]);
 
   useEffect(() => {
     if (pollStatus !== 'active') {
@@ -88,7 +100,7 @@ const ChampionSelect = ({
     return () => window.clearTimeout(timeout);
   }, [lockInFeedback]);
 
-  const canSelectChampion = isAdmin || pollStatus === 'active';
+  const canSelectChampion = !isAdmin && pollStatus === 'active' && !lockedChampion;
 
   const handleSelect = (champion: Champion) => {
     if (!canSelectChampion || isLockingIn) {
@@ -137,7 +149,7 @@ const ChampionSelect = ({
   };
 
   const handleLockIn = async () => {
-    if (!selectedChampion || pollStatus !== 'active' || isLockingIn) {
+    if (!selectedChampion || pollStatus !== 'active' || isLockingIn || lockedChampion) {
       return;
     }
 
@@ -157,6 +169,11 @@ const ChampionSelect = ({
   const statusLabel = STATUS_LABEL[pollStatus];
   const showWaitingMessage = !isAdmin && pollStatus !== 'active';
   const voteSummary = totalVotes === 1 ? '1 vote cast' : `${totalVotes} votes cast`;
+
+  const pendingLabel = selectedChampion ? `Lock In ${selectedChampion.name}` : 'Lock In';
+  const lockedLabel = lockedChampion ? `Lock In ${lockedChampion.name}` : pendingLabel;
+  const shouldDisableLockIn =
+    !selectedChampion || pollStatus !== 'active' || Boolean(lockedChampion) || isLockingIn;
 
   return (
     <div className="champion-select">
@@ -269,34 +286,36 @@ const ChampionSelect = ({
         )}
       </section>
 
-      <div className="champion-select__content">
-        <div className="champion-select__grid">
-          <ChampionGrid
-            champions={junglers}
-            selectedChampionSlug={selectedChampion?.slug}
-            onSelect={handleSelect}
-          />
-        </div>
+      {!isAdmin && (
+        <div className="champion-select__content">
+          <div className="champion-select__grid">
+            <ChampionGrid
+              champions={junglers}
+              selectedChampionSlug={selectedChampion?.slug}
+              onSelect={handleSelect}
+            />
+          </div>
 
-        <div className="champion-select__lock-in">
-          <LockInButton
-            disabled={!selectedChampion || pollStatus !== 'active'}
-            label={selectedChampion ? `Lock In ${selectedChampion.name}` : 'Lock In'}
-            loading={isLockingIn}
-            onClick={handleLockIn}
-          />
-          {lockInFeedback === 'success' && (
-            <span className="champion-select__lock-in-feedback champion-select__lock-in-feedback--success">
-              Pick submitted
-            </span>
-          )}
-          {lockInFeedback === 'error' && lockInError && (
-            <span className="champion-select__lock-in-feedback champion-select__lock-in-feedback--error">
-              {lockInError}
-            </span>
-          )}
+          <div className="champion-select__lock-in">
+            <LockInButton
+              disabled={shouldDisableLockIn}
+              label={lockedLabel}
+              loading={isLockingIn}
+              onClick={handleLockIn}
+            />
+            {lockInFeedback === 'success' && (
+              <span className="champion-select__lock-in-feedback champion-select__lock-in-feedback--success">
+                Pick submitted
+              </span>
+            )}
+            {lockInFeedback === 'error' && lockInError && (
+              <span className="champion-select__lock-in-feedback champion-select__lock-in-feedback--error">
+                {lockInError}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

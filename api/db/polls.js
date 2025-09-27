@@ -9,6 +9,9 @@ const createPollStore = (db) => {
   const insertVote = db.prepare(
     'INSERT INTO poll_votes (poll_id, voter_id, champion_slug) VALUES (?, ?, ?)',
   );
+  const findVoteByVoter = db.prepare(
+    'SELECT id FROM poll_votes WHERE poll_id = ? AND voter_id = ? LIMIT 1',
+  );
   const deleteVotesForPoll = db.prepare('DELETE FROM poll_votes WHERE poll_id = ?');
   const getVotesForPoll = db.prepare(
     'SELECT poll_id, voter_id, champion_slug, created_at FROM poll_votes WHERE poll_id = ? ORDER BY id ASC',
@@ -61,6 +64,19 @@ const createPollStore = (db) => {
   };
 
   const recordVote = ({ pollId, voterId = null, championSlug }) => {
+    if (!voterId) {
+      const error = new Error('VOTER_ID_REQUIRED');
+      error.code = 'VOTER_ID_REQUIRED';
+      throw error;
+    }
+
+    const existing = findVoteByVoter.get(pollId, voterId);
+    if (existing) {
+      const error = new Error('ALREADY_VOTED');
+      error.code = 'ALREADY_VOTED';
+      throw error;
+    }
+
     insertVote.run(pollId, voterId, championSlug);
     return {
       votes: getVotesForPoll.all(pollId),
