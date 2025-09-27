@@ -13,6 +13,17 @@ const createPollStore = (db) => {
   const getVotesForPoll = db.prepare(
     'SELECT poll_id, voter_id, champion_slug, created_at FROM poll_votes WHERE poll_id = ? ORDER BY id ASC',
   );
+  const getTopVotesForPoll = db.prepare(
+    `SELECT champion_slug AS championSlug, COUNT(*) AS voteCount
+     FROM poll_votes
+     WHERE poll_id = ?
+     GROUP BY champion_slug
+     ORDER BY voteCount DESC, championSlug ASC
+     LIMIT ?`,
+  );
+  const getVoteCountForPoll = db.prepare(
+    'SELECT COUNT(*) AS totalVotes FROM poll_votes WHERE poll_id = ?',
+  );
 
   const ensureStatus = (status) => {
     if (!VALID_STATUSES.has(status)) {
@@ -38,9 +49,24 @@ const createPollStore = (db) => {
     return getPoll.get(id);
   };
 
+  const topVotes = (pollId, limit = 3) => {
+    return getTopVotesForPoll
+      .all(pollId, limit)
+      .map((row) => ({ championSlug: row.championSlug, count: Number(row.voteCount) }));
+  };
+
+  const totalVotes = (pollId) => {
+    const row = getVoteCountForPoll.get(pollId);
+    return row ? Number(row.totalVotes) : 0;
+  };
+
   const recordVote = ({ pollId, voterId = null, championSlug }) => {
     insertVote.run(pollId, voterId, championSlug);
-    return getVotesForPoll.all(pollId);
+    return {
+      votes: getVotesForPoll.all(pollId),
+      topVotes: topVotes(pollId),
+      totalVotes: totalVotes(pollId),
+    };
   };
 
   const clearVotes = (pollId) => {
@@ -56,6 +82,8 @@ const createPollStore = (db) => {
     recordVote,
     clearVotes,
     allVotes,
+    topVotes,
+    totalVotes,
   };
 };
 

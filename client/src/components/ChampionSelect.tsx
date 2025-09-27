@@ -2,11 +2,13 @@
 import ChampionGrid from './ChampionGrid';
 import LockInButton from './LockInButton';
 import { junglers, type Champion } from '../data/junglers';
-import type { PollStatus } from '../types/poll';
+import type { PollStatus, TopVote } from '../types/poll';
 
 const TIMER_PLACEHOLDER = 81;
 
 type LockInFeedbackState = 'idle' | 'success' | 'error';
+
+const CHAMPIONS_BY_SLUG = new Map(junglers.map((champion) => [champion.slug, champion]));
 
 interface ChampionSelectProps {
   pollId: string;
@@ -18,6 +20,9 @@ interface ChampionSelectProps {
   isLockingIn: boolean;
   statusMessage?: string | null;
   statusError?: string | null;
+  topVotes: TopVote[];
+  totalVotes: number;
+  socketError?: string | null;
   onStartPoll: () => void | Promise<void>;
   onStopPoll: () => void | Promise<void>;
   onRestartPoll: () => void | Promise<void>;
@@ -40,6 +45,9 @@ const ChampionSelect = ({
   isLockingIn,
   statusMessage,
   statusError,
+  topVotes,
+  totalVotes,
+  socketError,
   onStartPoll,
   onStopPoll,
   onRestartPoll,
@@ -148,6 +156,7 @@ const ChampionSelect = ({
 
   const statusLabel = STATUS_LABEL[pollStatus];
   const showWaitingMessage = !isAdmin && pollStatus !== 'active';
+  const voteSummary = totalVotes === 1 ? '1 vote cast' : `${totalVotes} votes cast`;
 
   return (
     <div className="champion-select">
@@ -231,6 +240,34 @@ const ChampionSelect = ({
             : 'Lock in your jungler below.'}
         </div>
       )}
+
+      <section className="champion-select__standings">
+        <div className="champion-select__standings-header">
+          <span className="champion-select__standings-title">Top Picks</span>
+          <span className="champion-select__standings-total">{voteSummary}</span>
+        </div>
+        {socketError && (
+          <span className="champion-select__standings-warning">{socketError}</span>
+        )}
+        {totalVotes === 0 ? (
+          <span className="champion-select__standings-empty">No votes yet. Be the first to lock in!</span>
+        ) : (
+          <ol className="champion-select__standings-list">
+            {topVotes.map((entry, index) => {
+              const champion = CHAMPIONS_BY_SLUG.get(entry.championSlug);
+              const displayName = champion?.name ?? entry.championSlug;
+
+              return (
+                <li key={entry.championSlug} className="champion-select__standings-item">
+                  <span className="champion-select__standings-rank">#{index + 1}</span>
+                  <span className="champion-select__standings-name">{displayName}</span>
+                  <span className="champion-select__standings-count">{entry.count}</span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
 
       <div className="champion-select__content">
         <div className="champion-select__grid">

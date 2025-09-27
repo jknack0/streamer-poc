@@ -1,10 +1,12 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Socket } from 'socket.io-client';
 import ChampionSelect from './components/ChampionSelect';
 import type { Champion } from './data/junglers';
-import { ApiError, clearVotes, createPoll, fetchPoll, recordVote, updatePollStatus } from './services/polls';
+import { ApiError, clearVotes, createPoll, fetchPoll, fetchVotes, recordVote, updatePollStatus } from './services/polls';
 import type { Poll } from './services/polls';
+import { createSocket, type PollErrorEvent, type PollUpdateEvent, type PollVotesEvent } from './services/socket';
 import './App.css';
-import type { PollStatus } from './types/poll';
+import type { PollStatus, TopVote } from './types/poll';
 
 const ADMIN_KEY_PREFIX = 'poll-admin:';
 const VOTER_KEY_PREFIX = 'poll-voter:';
@@ -50,7 +52,7 @@ const App = () => {
   const [route, setRoute] = useState<Route>(() => {
     if (typeof window === 'undefined') {
       return { name: 'home' };
-    }
+  }
 
     return parsePath(window.location.pathname);
   });
@@ -64,6 +66,11 @@ const App = () => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [isLockingIn, setIsLockingIn] = useState(false);
+  const [topVotes, setTopVotes] = useState<TopVote[]>([]);
+  const [totalVotes, setTotalVotes] = useState(0);
+  const [socketError, setSocketError] = useState<string | null>(null);
+
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -86,6 +93,13 @@ const App = () => {
       setPollError(null);
       setStatusMessage(null);
       setStatusError(null);
+      setTopVotes([]);
+      setTotalVotes(0);
+      setSocketError(null);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
       return;
     }
 
@@ -93,6 +107,9 @@ const App = () => {
     const loadPoll = async () => {
       setIsLoadingPoll(true);
       setPollError(null);
+      setTopVotes([]);
+      setTotalVotes(0);
+
       try {
         const data = await fetchPoll(route.pollId);
         if (!isMounted) {
@@ -100,6 +117,26 @@ const App = () => {
         }
 
         setPoll(data);
+
+        try {
+          const voteData = await fetchVotes(route.pollId);
+          if (!isMounted) {
+            return;
+          }
+
+          setTopVotes(voteData.topVotes);
+          setTotalVotes(voteData.totalVotes);
+        } catch (voteError) {
+          if (isMounted) {
+            const message =
+              voteError instanceof ApiError
+                ? voteError.message
+                : voteError instanceof Error
+                  ? voteError.message
+                  : 'Failed to load votes';
+            setSocketError((prev) => prev ?? message);
+          }
+        }
       } catch (error) {
         if (!isMounted) {
           return;
@@ -145,6 +182,79 @@ const App = () => {
     return () => window.clearTimeout(timeout);
   }, [statusMessage, statusError]);
 
+  useEffect(() => {
+    if (route.name !== 'poll') {
+      return;
+    }
+
+    const socket = createSocket();
+    socketRef.current = socket;
+    setSocketError(null);
+
+    const handlePollUpdate = (payload: PollUpdateEvent) => {
+      if (!payload?.poll || payload.poll.id !== route.pollId) {
+        return;
+      }
+
+      setPoll((current) => {
+        if (!current || current.id === payload.poll.id) {
+          return payload.poll;
+        }
+
+        return current;
+      });
+    };
+
+    const handlePollVotes = (payload: PollVotesEvent) => {
+      if (!payload || payload.pollId !== route.pollId) {
+        return;
+      }
+
+      setTopVotes(payload.topVotes ?? []);
+      setTotalVotes(typeof payload.totalVotes === 'number' ? payload.totalVotes : 0);
+    };
+
+    const handlePollError = (payload: PollErrorEvent | string) => {
+      if (typeof payload === 'string') {
+        setSocketError(payload);
+        return;
+      }
+
+      if (!payload) {
+        return;
+      }
+
+      if ('error' in payload && typeof payload.error === 'string') {
+        setSocketError(payload.error);
+      }
+    };
+
+    socket.on('connect', () => {
+      setSocketError(null);
+      socket.emit('poll:join', route.pollId);
+    });
+
+    socket.on('poll:update', handlePollUpdate);
+    socket.on('poll:votes', handlePollVotes);
+    socket.on('poll:error', handlePollError);
+    socket.on('connect_error', (error) => {
+      handlePollError(error instanceof Error ? error.message : 'Connection error');
+    });
+    socket.on('error', (error) => {
+      handlePollError(error instanceof Error ? error.message : 'Socket error');
+    });
+
+    socket.connect();
+
+    return () => {
+      socket.removeListener('poll:update', handlePollUpdate);
+      socket.removeListener('poll:votes', handlePollVotes);
+      socket.removeListener('poll:error', handlePollError);
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [route]);
+
   const navigate = useCallback((next: Route, replace = false) => {
     if (typeof window === 'undefined') {
       return;
@@ -172,7 +282,7 @@ const App = () => {
       return;
     }
 
-    setIsCreatingPoll(true);
+  setIsCreatingPoll(true);
     setHomeError(null);
 
     const pollId = crypto.randomUUID();
@@ -181,6 +291,8 @@ const App = () => {
       const createdPoll = await createPoll({ id: pollId });
       localStorage.setItem(`${ADMIN_KEY_PREFIX}${pollId}`, 'true');
       setPoll(createdPoll);
+      setTopVotes([]);
+      setTotalVotes(0);
       navigate({ name: 'poll', pollId });
     } catch (error) {
       if (error instanceof ApiError) {
@@ -261,6 +373,8 @@ const App = () => {
       const updated = await updatePollStatus(poll.id, 'active');
       setPoll(updated);
       setPollVersion((current) => current + 1);
+      setTopVotes([]);
+      setTotalVotes(0);
       setStatusMessage('Poll restarted');
     } catch (error) {
       if (error instanceof ApiError) {
@@ -286,6 +400,8 @@ const App = () => {
         const voterId = getOrCreateVoterId(poll.id);
         const response = await recordVote(poll.id, champion.slug, voterId);
         setPoll(response.poll);
+        setTopVotes(response.topVotes);
+        setTotalVotes(response.totalVotes);
       } catch (error) {
         if (error instanceof ApiError) {
           throw new Error(error.message);
@@ -363,6 +479,9 @@ const App = () => {
       isLockingIn={isLockingIn}
       statusMessage={statusMessage}
       statusError={statusError}
+      topVotes={topVotes}
+      totalVotes={totalVotes}
+      socketError={socketError}
       onStartPoll={handleStartPoll}
       onStopPoll={handleStopPoll}
       onRestartPoll={handleRestartPoll}
