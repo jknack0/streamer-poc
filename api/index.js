@@ -59,13 +59,13 @@ const pollController = createPollController({
   emitVoteSummary: pollSocket.emitVoteSummary,
 });
 
-app.use('/polls', createPollRouter(pollController));
+app.use('/api/polls', createPollRouter(pollController));
 
 pollSocket.register();
 
 if (isProduction) {
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/socket.io')) {
+    if (req.path.startsWith('/socket.io') || req.path.startsWith('/api')) {
       return next();
     }
 

@@ -70,13 +70,13 @@ cd client
 npm run dev
 ```
 
-Vite serves the client at `http://localhost:5173`. The client expects the API to run at `http://localhost:3000` unless you override `VITE_API_URL`.
+Vite serves the client at `http://localhost:5173`. The client expects the API to run at `http://localhost:3000/api` unless you override `VITE_API_URL`.
 
 ## API Overview
 
-All endpoints live under the API root (default `http://localhost:3000`). JSON payloads only.
+All endpoints live under the API root (default `http://localhost:3000/api`). JSON payloads only.
 
-### `POST /polls`
+### `POST /api/polls`
 Creates a poll.
 
 ```json
@@ -96,10 +96,10 @@ Response `201`:
 }
 ```
 
-### `GET /polls/:id`
+### `GET /api/polls/:id`
 Returns poll metadata. `404` if not found.
 
-### `POST /polls/:id/status`
+### `POST /api/polls/:id/status`
 Updates poll status (`idle` | `active` | `stopped`). Broadcasts via sockets.
 
 ```json
@@ -110,7 +110,7 @@ Updates poll status (`idle` | `active` | `stopped`). Broadcasts via sockets.
 
 Response: poll object; `404` if missing.
 
-### `POST /polls/:id/votes`
+### `POST /api/polls/:id/votes`
 Records a vote.
 
 ```json
@@ -131,10 +131,10 @@ Response `201`:
 ```
 Broadcasts updated standings via sockets.
 
-### `GET /polls/:id/votes`
+### `GET /api/polls/:id/votes`
 Returns all votes plus summary (top three and total).
 
-### `DELETE /polls/:id/votes`
+### `DELETE /api/polls/:id/votes`
 Clears votes for the poll (admin restart). Emits empty standings.
 
 ## Socket Events

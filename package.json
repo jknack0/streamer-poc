@@ -13,7 +13,8 @@
         "docker:run": "docker run --name jungle-champ-select -p 3000:3000 jungle-champ-select",
         "docker:stop": "docker stop jungle-champ-select",
         "docker:rm": "docker rm jungle-champ-select",
-        "docker:rebuild": "docker build --no-cache -t jungle-champ-select ."
+        "docker:rebuild": "docker build --no-cache -t jungle-champ-select .",
+        "deploy:fly": "fly deploy --app jungle-champ-select --remote-only"
     },
     "keywords": [],
     "author": "",

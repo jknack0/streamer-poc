@@ -1,6 +1,7 @@
-﻿import type { PollStatus, TopVote } from '../types/poll';
+import type { PollStatus, TopVote } from '../types/poll';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+const API_PREFIX = '/api';
 
 interface Poll {
   id: string;
@@ -79,7 +80,8 @@ const normalizeTopVotes = (entries: unknown[] = []): TopVote[] =>
     .filter((value): value is TopVote => value !== null);
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const url = `${API_BASE_URL}${API_PREFIX}${path}`;
+  const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
@@ -171,3 +173,4 @@ const clearVotes = async (pollId: string) => {
 
 export type { Poll, Vote };
 export { ApiError, clearVotes, createPoll, fetchPoll, fetchVotes, recordVote, updatePollStatus };
+
