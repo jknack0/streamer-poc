@@ -1,0 +1,17 @@
+﻿CREATE TABLE IF NOT EXISTS polls (
+  id TEXT PRIMARY KEY,
+  status TEXT NOT NULL CHECK(status IN ('idle', 'active', 'stopped')),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS poll_votes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  poll_id TEXT NOT NULL,
+  voter_id TEXT,
+  champion_slug TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_poll_votes_poll_id ON poll_votes (poll_id);
