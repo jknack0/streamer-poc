@@ -5,9 +5,15 @@
     "main": "index.js",
     "scripts": {
         "start:client": "npm run dev --prefix client",
-        "start:api": "npm start --prefix api",
+        "start:api": "npm run dev --prefix api",
         "start": "concurrently \"npm run start:client\" \"npm run start:api\"",
-        "build": "npm run build --prefix client"
+        "build": "npm run build --prefix client",
+        "install:all": "npm install && npm install --prefix client && npm install --prefix api",
+        "docker:build": "docker build -t jungle-champ-select .",
+        "docker:run": "docker run --name jungle-champ-select -p 3000:3000 jungle-champ-select",
+        "docker:stop": "docker stop jungle-champ-select",
+        "docker:rm": "docker rm jungle-champ-select",
+        "docker:rebuild": "docker build --no-cache -t jungle-champ-select ."
     },
     "keywords": [],
     "author": "",
